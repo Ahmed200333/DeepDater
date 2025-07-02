@@ -13,20 +13,20 @@ This repository contains different pipelines for:
 
 ## Folder Structure
 .
-├── compare_all_dates.py	# Comparison script for LSD2
-├── csv_to_dates_vector.py	# Script that converts a CSV date file
-├── deepl_dating_model.py	# Script that implements the deep learning model
-├── simulate_time_trees.py	# Code to tune parameters
-├── time_to_genetic_distance.py	# Code to convert the time tree into a genetic distance tree
-├── test_newick_to_vector.py	# Code to implement the newick tree to a vector
-├── predict_dates.py	# User interface to get date predictions from a genetic Newick tree and a CSV date file
-├── Snakefile_prepare_data         # Main pipeline: vectors + dataset
-├── Snakefile_lsd2_eval        # LSD2: inference + evaluation
-├── Snakefile_simulation_for_trees   # Optional: generate .nwk and .csv only
-├── trees_for_deepl/           # Simulated time trees and CSVs
-├── processed_for_deepl/       # Genetic trees and vector files
-├── processed/                 # For LSD2 evaluation (folder 0)
-├── setup_data.py              # Padding and dataset creation
+-  compare_all_dates.py	# Comparison script for LSD2
+-  csv_to_dates_vector.py	# Script that converts a CSV date file
+-  deepl_dating_model.py	# Script that implements the deep learning model
+-  simulate_time_trees.py	# Code to tune parameters
+-  time_to_genetic_distance.py	# Code to convert the time tree into a genetic distance tree
+-  test_newick_to_vector.py	# Code to implement the newick tree to a vector
+-  predict_dates.py	# User interface to get date predictions from a genetic Newick tree and a CSV date file
+-  Snakefile_prepare_data         # Main pipeline: vectors + dataset
+-  Snakefile_lsd2_eval        # LSD2: inference + evaluation
+-  Snakefile_simulation_for_trees   # Optional: generate .nwk and .csv only
+-  trees_for_deepl/           # Simulated time trees and CSVs
+-  processed_for_deepl/       # Genetic trees and vector files
+-  processed/                 # For LSD2 evaluation (folder 0)
+-  setup_data.py              # Padding and dataset creation
 
 
 ## Requirements
