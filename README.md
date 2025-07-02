@@ -1,2 +1,70 @@
 # DeepDater
 Tis repository is my 6 month master's internship project, the purpose of the project was to code from scratch a library to date phylogenetic trees with deep learning.
+
+# Deep Learning for infering dates on phylogenies
+This project gather many tools that implement simulation for trees, training for a deep neural network, mesure the performances on predictions and mesure performances for LSD2.
+
+This repository contains a different pipelines for:
+- Simulating time-calibrated phylogenetic trees
+- Converting them to genetic trees
+- Extracting date vectors (partial and complete)
+- Training and evaluating a deep learning model to predict internal node dates
+- Comparing predictions with LSD2 as a baseline
+
+## Folder Structure
+.
+├── compare_all_dates.py	# Comparison script for LSD2
+├── csv_to_dates_vector.py	# Script that converts a CSV date file
+├── deepl_dating_model.py	# Script that implements the deep learning model
+├── simulate_time_trees.py	# Code to tune parameters
+├── time_to_genetic_distance.py	# Code to convert the time tree into a genetic distance tree
+├── test_newick_to_vector.py	# Code to implement the newick tree to a vector
+├── predict_dates.py	# User interface to get date predictions from a genetic Newick tree and a CSV date file
+├── Snakefile_prepare_data         # Main pipeline: vectors + dataset
+├── Snakefile_lsd2_eval        # LSD2: inference + evaluation
+├── Snakefile_simulation_for_trees   # Optional: generate .nwk and .csv only
+├── trees_for_deepl/           # Simulated time trees and CSVs
+├── processed_for_deepl/       # Genetic trees and vector files
+├── processed/                 # For LSD2 evaluation (folder 0)
+├── setup_data.py              # Padding and dataset creation
+
+
+## Requirements
+
+Install dependencies with:
+pip install numpy pandas ete3 snakemake scipy tensorflow
+Make sure you have LSD2 installed and in your $PATH
+
+
+## Simulation for trees
+
+To simulate time trees with their associated leaf dates, you can simply execute the Snakefile named "Snakefile_simulation_for_trees". You fix the number of time trees that you want to simulate in the snakefile and you can tune the parameters like the sampling probabilities the alignment length etc... in the Python file "simulate_time_trees.py". By default the root date range is between 1950 and 2000 but of course you can modify it if you want.
+
+In the terminal, make sure you are located in the right folder and then execute : "Snakemake --snakefile Snakefile_simulation_for_trees --cores 12 --keep-going --rerun-incomplete --latency-wait 30".
+
+Once its executed, you might have a new folder called trees_for_deepl which contains as many subfolders as you want (tunable in the snakefile directly) with the time trees (branches measured in years) and the csv files associated to each tree that stores the leaf names and dates.
+
+## Data preprocessing (for training)
+
+Once we have generated our trees with dates, we need to vectorize the data in order to feed the neural network. You will find the parameters (tunable) that we originally use to convert the time distance into a genetic distance in the script "time_to_genetic_distance.py". The entire data preprocessing (conversion + vectorization + padding) is gathered in the snakefile "Snakefile_prepare_data". To execute the pipeline you need to already have the trees and dates simulated.
+
+The functions used for pure vectorization (without padding or normalization) are in the script "test_newick_to_vector.py". The fonctions used to pad the vectors are in "setup_data.py" if you want to have a look at how they are built.
+
+The Snakefile "Snakefile_prepare_data" can be executed by typing (in the right folder) : "Snakemake --snakefile Snakefile_simulation_for_trees --cores 12 --keep-going --rerun-incomplete --latency-wait 30".
+After the execution, the genetic conversion have been applied and all the necessary vectors have been generated in settable folders (see the snakefile).
+
+The Snakefile produces a single ".npz" file that contains all the necessary vectors ready to be used by the neural network.
+
+## Deep Learning Model
+
+All the architecture is encoded in the file "deepl_dating_model.py". It uses the data stored previously in the "final_dataset.npz" file.
+
+You can just execute the python script to train the model and get the performances, after the execution and training the model will be stored in the indicated folder as a ".keras" file.
+
+You can visualize the accuracy for specific metrics after execution and you can also play with hyperparameters of the model to test various architectures.
+
+## How to make predictions
+
+To make your predictions, you need to have a genetic tree (branch measured in genetic distance) in Newick format and the csv dates file (look at the paper or the structure of the existing files). You will have to execute "predict_dates.py" and specify the path for your genetic Newick tree, your csv dates file for the leaves and the path for keras model.
+
+The algorithm will output a newick dated tree and the date of the root. You can visualize the outputed tree in the ITOL IcyTree.
