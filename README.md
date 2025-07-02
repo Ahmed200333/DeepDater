@@ -4,7 +4,7 @@ This repository is my 6 month master's internship project, the purpose of the pr
 # Deep Learning for infering dates on phylogenies
 This project gather many tools that implement simulation for trees, training for a deep neural network, mesure the performances on predictions and mesure performances for LSD2.
 
-This repository contains a different pipelines for:
+This repository contains different pipelines for:
 - Simulating time-calibrated phylogenetic trees
 - Converting them to genetic trees
 - Extracting date vectors (partial and complete)
@@ -67,4 +67,4 @@ You can visualize the accuracy for specific metrics after execution and you can 
 
 To make your predictions, you need to have a genetic tree (branch measured in genetic distance) in Newick format and the csv dates file (look at the paper or the structure of the existing files). You will have to execute "predict_dates.py" and specify the path for your genetic Newick tree, your csv dates file for the leaves and the path for keras model.
 
-The algorithm will output a newick dated tree and the date of the root. You can visualize the outputed tree in the ITOL IcyTree.
+The algorithm will output a newick dated tree and the date of the root. You can visualize the outputed tree in  ITOL or IcyTree.
