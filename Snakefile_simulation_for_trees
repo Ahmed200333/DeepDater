@@ -1,0 +1,37 @@
+import os
+
+# Parameters
+n_dossiers = 10                # Number of folders (batches)
+arbres_par_dossier = 1000      # Trees per folder
+min_tips = 200
+max_tips = 500
+
+# Targets = all output files (Newick trees + CSVs with leaf dates)
+rule all:
+    input:
+        expand(
+            "trees_for_deepl/{dossier}/BD_tree{index}.nwk",
+            dossier=range(n_dossiers),
+            index=range(arbres_par_dossier)
+        ),
+        expand(
+            "trees_for_deepl/{dossier}/leaf_dates{index}.csv",
+            dossier=range(n_dossiers),
+            index=range(arbres_par_dossier)
+        )
+
+# Rule to generate a single tree and corresponding dates
+rule simulate_tree:
+    output:
+        newick="trees_for_deepl/{dossier}/BD_tree{index}.nwk",
+        dates="trees_for_deepl/{dossier}/leaf_dates{index}.csv"
+    shell:
+        """
+        mkdir -p trees_for_deepl/{wildcards.dossier}
+        python simulate_time_trees.py \
+            --nwk {output.newick} \
+            --csv {output.dates} \
+            --min_tips {min_tips} \
+            --max_tips {max_tips}
+        """
+

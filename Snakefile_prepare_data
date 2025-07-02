@@ -1,0 +1,131 @@
+#############################################
+# Snakefile_pipeline (multi-folder version)
+#############################################
+# This pipeline processes 1000 trees in each folder (0 to n_folders-1)
+#############################################
+
+# Optional fix for older PuLP versions (can be removed if unused)
+import pulp
+if not hasattr(pulp, "list_solvers"):
+    pulp.list_solvers = pulp.listSolvers
+if not hasattr(pulp, "get_solver"):
+    def get_solver(name, **kwargs):
+        return pulp.PULP_CBC_CMD(**kwargs)
+    pulp.get_solver = get_solver
+
+# Global configuration
+sim_dir = "trees_for_deepl"          # Directory with time trees and date CSVs
+n_folders = 1                        # Number of folders (e.g., 1 → only folder 0)
+TREES_PER_FOLDER = 1000             # Number of trees per folder
+
+# Final rule: create the full dataset for training
+rule all:
+    input:
+        "final_dataset.npz"
+
+# Step 1: Convert time-based tree to genetic tree (modifies branch lengths)
+rule convert_time_to_genetic:
+    input:
+        nwk = lambda wc: f"{sim_dir}/{wc.folder}/BD_tree{wc.tree_id}.nwk"
+    output:
+        genetic = "processed_for_deepl/{folder}/BD_tree{tree_id}_genetic.nwk"
+    shell:
+        r"""
+        mkdir -p processed_for_deepl/{wildcards.folder}
+        python3 -c "from time_to_genetic_distance import time_tree_to_genetic_tree; time_tree_to_genetic_tree('{input.nwk}', output_nwk='{output.genetic}')"
+        """
+
+# Step 2: Convert genetic tree to vector (antisymmetric matrix → 1D vector)
+rule tree_to_vector:
+    input:
+        genetic = "processed_for_deepl/{folder}/BD_tree{tree_id}_genetic.nwk"
+    output:
+        vector = "processed_for_deepl/{folder}/BD_tree{tree_id}_vector.npy"
+    shell:
+        r"""
+        python3 -c "import numpy as np; from test_newick_to_vector import newick_to_jax_vector; vec = newick_to_jax_vector('{input.genetic}'); print(f'Tree vector: {{vec}} (size {{len(vec)}})'); np.save('{output.vector}', np.array(vec))"
+        """
+
+# Step 3: Create partial date vector from leaf CSV (known tips only)
+rule create_date_vector:
+    input:
+        time_vector = "trees_for_deepl/{folder}/BD_tree{tree_id}.nwk",
+        csv = lambda wc: f"{sim_dir}/{wc.folder}/leaf_dates{wc.tree_id}.csv"
+    output:
+        date_vector = "processed_for_deepl/{folder}/leaf_dates_vector{tree_id}.npy"
+    shell:
+        r"""
+        python3 -c "import numpy as np; from csv_to_dates_vector import get_ordered_nodes, csv_to_dates_vector, name_internal_nodes; from ete3 import Tree; t = name_internal_nodes(Tree('{input.time_vector}', format=1)); order = get_ordered_nodes(t); vec = csv_to_dates_vector('{input.csv}', order); print(f'Partial date vector: {{vec}} (size {{len(vec)}})'); np.save('{output.date_vector}', vec)"
+        """
+
+# Step 4: Create complete date vector for all nodes using the genetic tree order
+rule build_complete_date_vector:
+    input:
+        time_nwk = lambda wc: f"{sim_dir}/{wc.folder}/BD_tree{wc.tree_id}.nwk",
+        csv = lambda wc: f"{sim_dir}/{wc.folder}/leaf_dates{wc.tree_id}.csv",
+        genetic_nwk = "processed_for_deepl/{folder}/BD_tree{tree_id}_genetic.nwk"
+    output:
+        complete_date_vector = "processed_for_deepl/{folder}/leaf_dates_complete_vector{tree_id}.npy"
+    shell:
+        r"""
+        python3 -c "
+import numpy as np
+from csv_to_dates_vector import build_complete_date_vector, get_ordered_nodes, name_internal_nodes
+from ete3 import Tree
+
+# Load time tree and name internal nodes
+g = Tree('{input.time_nwk}', format=1)
+g = name_internal_nodes(g)
+
+# Load genetic tree to determine consistent node order
+gen_tree = Tree('{input.genetic_nwk}', format=1)
+gen_tree = name_internal_nodes(gen_tree)
+order = get_ordered_nodes(gen_tree)
+
+# Build full date vector
+vec = build_complete_date_vector(g, order, '{input.csv}')
+print(f'Full date vector: {{vec}} (size {{len(vec)}})')
+
+np.save('{output.complete_date_vector}', vec)
+"
+        """
+
+# Step 5: Combine, pad, and export everything into a single .npz file for model training
+rule pad_dataset:
+    input:
+        vectors = expand("processed_for_deepl/{folder}/BD_tree{tree_id}_vector.npy", folder=[str(i) for i in range(n_folders)], tree_id=range(TREES_PER_FOLDER)),
+        complete_dates = expand("processed_for_deepl/{folder}/leaf_dates_complete_vector{tree_id}.npy", folder=[str(i) for i in range(n_folders)], tree_id=range(TREES_PER_FOLDER)),
+        partial_dates = expand("processed_for_deepl/{folder}/leaf_dates_vector{tree_id}.npy", folder=[str(i) for i in range(n_folders)], tree_id=range(TREES_PER_FOLDER))
+    output:
+        dataset = "final_dataset.npz"
+    run:
+        import numpy as np
+        from setup_data import pad_dataset_extended
+
+        all_vectors = []
+        all_complete = []
+        all_partial = []
+
+        print("Loading numpy files...")
+        for folder in range(n_folders):
+            for i in range(TREES_PER_FOLDER):
+                try:
+                    print(f"Loading folder {folder}, tree {i}...")
+                    vec = np.load(f"processed_for_deepl/{folder}/BD_tree{i}_vector.npy", allow_pickle=True)
+                    comp = np.load(f"processed_for_deepl/{folder}/leaf_dates_complete_vector{i}.npy", allow_pickle=True)
+                    part = np.load(f"processed_for_deepl/{folder}/leaf_dates_vector{i}.npy", allow_pickle=True)
+                    all_vectors.append(vec)
+                    all_complete.append(comp)
+                    all_partial.append(part)
+                except Exception as e:
+                    print(f"Error loading file {folder}-{i}: {e}")
+
+        print("Padding tensors...")
+        try:
+            X, y_complete, y_partial = pad_dataset_extended(all_vectors, all_complete, all_partial)
+            print("Saving to final_dataset.npz...")
+            np.savez(output.dataset, X=X, y_complete=y_complete, y_partial=y_partial)
+            print("final_dataset.npz created successfully.")
+        except Exception as e:
+            print(f"Padding or saving failed: {e}")
+

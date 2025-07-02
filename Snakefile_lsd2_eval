@@ -1,0 +1,181 @@
+import os
+
+# Constants
+PROCESSED = "processed/0"
+TREES     = "trees/0"
+N         = 1000         # Number of trees
+MIN_TIPS  = 200
+MAX_TIPS  = 500
+
+# Final target: all individual MAE results + global average
+rule all:
+    input:
+        expand(f"{PROCESSED}/lsd2_mae{{i}}.txt", i=range(N)),
+        f"{PROCESSED}/lsd2_avg_mae.txt"
+
+########################################
+# 0) Cleanup of previous run outputs
+########################################
+rule cleanup_outputs:
+    output:
+        temp(f"{PROCESSED}/.cleanup.done")
+    shell:
+        """
+        echo '[ CLEANUP] Deleting previous outputs...'
+        rm -f {PROCESSED}/*.txt {PROCESSED}/*.date.nexus
+        rm -f {TREES}/*.nwk {TREES}/*.csv
+        touch {output}
+        """
+
+########################################
+# 1) Simulate one time-calibrated tree and tip dates
+########################################
+rule simulate_tree:
+    input:
+        f"{PROCESSED}/.cleanup.done"
+    output:
+        nwk = f"{TREES}/BD_tree{{i}}.nwk",
+        csv = f"{TREES}/leaf_dates{{i}}.csv"
+    params:
+        min_tips = MIN_TIPS,
+        max_tips = MAX_TIPS
+    shell:
+        "python3 simulate_time_trees.py "
+        "--nwk {output.nwk} "
+        "--csv {output.csv} "
+        "--min_tips {params.min_tips} "
+        "--max_tips {params.max_tips}"
+
+########################################
+# 2) Convert time tree to genetic tree (LSD2 expects branch lengths in substitutions)
+########################################
+rule time_to_genetic_distance:
+    input:
+        tree = f"{TREES}/BD_tree{{i}}.nwk"
+    output:
+        genetic = f"{PROCESSED}/BD_tree{{i}}_genetic.nwk",
+        length  = f"{PROCESSED}/BD_tree{{i}}.len.txt"
+    shell:
+        "python3 time_to_genetic_distance.py "
+        "{input.tree} {output.genetic} {output.length}"
+
+########################################
+# 3) Build complete and partial date vectors from original tree
+########################################
+rule csv_to_dates_vector:
+    input:
+        tree = f"{PROCESSED}/BD_tree{{i}}_genetic.nwk",
+        csv  = f"{TREES}/leaf_dates{{i}}.csv"
+    output:
+        complete = f"{PROCESSED}/leaf_dates_complete_vector{{i}}.npy",
+        partial  = f"{PROCESSED}/leaf_dates_partial_vector{{i}}.npy"
+    shell:
+        "python3 csv_to_dates_vector.py "
+        "{input.tree} {input.csv} {output.complete} {output.partial}"
+
+########################################
+# 4) Convert CSV to LSD2 date format (tip name + tab + date)
+########################################
+rule csv_to_lsd2_dates:
+    input:
+        leaf_csv = f"{TREES}/leaf_dates{{i}}.csv"
+    output:
+        f"{PROCESSED}/leaf_dates_lsd2_format{{i}}.txt"
+    shell:
+        "python3 csv_to_lsd2_dates.py {input.leaf_csv} {output}"
+
+########################################
+# 5) Run LSD2 on genetic tree and formatted dates
+########################################
+rule run_lsd2:
+    input:
+        tree   = f"{PROCESSED}/BD_tree{{i}}_genetic.nwk",
+        dates  = f"{PROCESSED}/leaf_dates_lsd2_format{{i}}.txt",
+        length = f"{PROCESSED}/BD_tree{{i}}.len.txt"
+    output:
+        date_nexus = f"{PROCESSED}/lsd2_pred_tree{{i}}.date.nexus"
+    params:
+        prefix = lambda wc: f"{PROCESSED}/lsd2_pred_tree{wc.i}"
+    shell:
+        """
+        # Rename numerical tip labels (e.g. 45 or '45') to leaf45 for compatibility
+        sed -E "s/([,(])'?([0-9]+)'?:/\\1leaf\\2:/g" \
+            {input.tree} \
+            > {PROCESSED}/BD_tree{wildcards.i}_genetic_prefixed.nwk
+
+        # Run LSD2 using renamed tree and tip date file
+        lsd2 \
+          -i {PROCESSED}/BD_tree{wildcards.i}_genetic_prefixed.nwk \
+          -d {input.dates} \
+          -s $(cat {input.length}) \
+          -o {params.prefix} \
+          -R 100000 \
+          -l -1
+        """
+
+########################################
+# 6) Evaluate LSD2 predictions: RRE and NRMSE_internal
+########################################
+rule evaluate_lsd2:
+    input:
+        original_time_tree =  f"{TREES}/BD_tree{{i}}.nwk",
+        leaf_csv           =  f"{TREES}/leaf_dates{{i}}.csv",
+        nexus              =  f"{PROCESSED}/lsd2_pred_tree{{i}}.date.nexus"
+    output:
+        f"{PROCESSED}/lsd2_mae{{i}}.txt"
+    shell:
+        "python3 compare_all_dates.py "
+        "{input.original_time_tree} {input.leaf_csv} {input.nexus} {output}"
+
+########################################
+# 7) Compute mean RRE and NRMSE over all N trees
+########################################
+rule summarize_mae:
+    input:
+        expand(f"{PROCESSED}/lsd2_mae{{i}}.txt", i=range(N))
+    output:
+        f"{PROCESSED}/lsd2_avg_mae.txt"
+    run:
+        import numpy as np
+
+        rre_vals = []
+        nrmse_vals = []
+        nb_outliers = 0
+
+        # Parse metrics
+        for fn in input:
+            with open(fn) as fh:
+                for line in fh:
+                    key, val = line.strip().split("\t")
+                    if key == "RRE":
+                        rre_vals.append(float(val))
+                    elif key == "NRMSE_internal":
+                        nrmse_vals.append(float(val))
+
+        # Filter outliers for clean averaging
+        rre_outliers = [x for x in rre_vals if x > 0.5]
+        nrmse_outliers = [x for x in nrmse_vals if x > 1]
+
+        nb_outliers = len(rre_outliers) + len(nrmse_outliers)
+
+        rre_vals = [x for x in rre_vals if x <= 0.5]
+        nrmse_vals = [x for x in nrmse_vals if x <= 1]
+
+        for val in rre_outliers:
+            print(f"Outlier in RRE values: {val}")
+        for val in nrmse_outliers:
+            print(f"Outlier in NRMSE values: {val}")
+
+        print(f"Filtered RRE values: {rre_vals}")
+        print(f"Filtered NRMSE values: {nrmse_vals}")
+
+        mean_rre = float(np.mean(rre_vals)) if rre_vals else float("nan")
+        mean_nrmse = float(np.mean(nrmse_vals)) if nrmse_vals else float("nan")
+
+        with open(output[0], "w") as out:
+            out.write(f"Mean_RRE\t{mean_rre}\n")
+            out.write(f"Mean_NRMSE_internal\t{mean_nrmse}\n")
+
+        print(f"Mean RRE = {mean_rre:.6f}, Mean NRMSE_internal = {mean_nrmse:.6f}")
+        print(f"Total number of outliers removed: {nb_outliers}")
+
