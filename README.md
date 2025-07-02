@@ -6,7 +6,7 @@ This project gather many tools that implement simulation for trees, training for
 
 This repository contains different pipelines for:
 - Simulating time-calibrated phylogenetic trees
-- Converting them to genetic trees
+- Converting them into genetic trees
 - Extracting date vectors (partial and complete)
 - Training and evaluating a deep learning model to predict internal node dates
 - Comparing predictions with LSD2 as a baseline
