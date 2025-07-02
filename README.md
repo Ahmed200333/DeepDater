@@ -1,5 +1,5 @@
 # DeepDater
-Tis repository is my 6 month master's internship project, the purpose of the project was to code from scratch a library to date phylogenetic trees with deep learning.
+This repository is my 6 month master's internship project, the purpose of the project was to code from scratch a library to date phylogenetic trees with deep learning.
 
 # Deep Learning for infering dates on phylogenies
 This project gather many tools that implement simulation for trees, training for a deep neural network, mesure the performances on predictions and mesure performances for LSD2.
