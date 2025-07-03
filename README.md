@@ -68,4 +68,5 @@ You can visualize the accuracy for specific metrics after execution and you can 
 
 To make your predictions, you need to have a genetic tree (branch measured in genetic distance) in Newick format and the csv dates file (look at the paper or the structure of the existing files). You will have to execute ```predict_dates.py``` and specify the path for your genetic Newick tree, your csv dates file for the leaves and the path for keras model.
 
-The algorithm will output a newick dated tree and the date of the root. You can visualize the outputed tree in  ITOL or IcyTree.
+You can visualize the outputted tree in [iTOL](https://itol.embl.de/upload.cgi) or [IcyTree](https://icytree.org/).
+
