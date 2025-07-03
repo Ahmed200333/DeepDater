@@ -21,8 +21,8 @@ This repository contains different pipelines for:
 -  ```test_newick_to_vector.py```	# Code to implement the newick tree to a vector
 -  ```predict_dates.py```	# User interface to get date predictions from a genetic Newick tree and a CSV date file
 -   ```BD_tree0.nwk```	# exemple of simulated time tree
--   ```BD_tree0_genetic.nwk``` # exemple of genetic tree (time tree converted in genetic_tree)
--   ```
+-   ```BD_tree0_genetic.nwk``` # exemple of genetic tree (time tree converted into genetic_tree)
+-   ```leaf_dates0.csv``` # exemple of dates file 
 -  ```Snakefile_prepare_data```         # Main pipeline: vectors + dataset
 -  ```Snakefile_lsd2_eval```        # LSD2: inference + evaluation
 -  ```Snakefile_simulation_for_trees```   # Optional: generate .nwk and .csv only
