@@ -40,7 +40,7 @@ Make sure you have LSD2 installed and in your $PATH
 
 To simulate time trees with their associated leaf dates, you can simply execute the Snakefile named "Snakefile_simulation_for_trees". You fix the number of time trees that you want to simulate in the snakefile and you can tune the parameters like the sampling probabilities the alignment length etc... in the Python file "simulate_time_trees.py". By default the root date range is between 1950 and 2000 but of course you can modify it if you want.
 
-In the terminal, make sure you are located in the right folder and then execute : "Snakemake --snakefile Snakefile_simulation_for_trees --cores 12 --keep-going --rerun-incomplete --latency-wait 30".
+In the terminal, make sure you are located in the right folder and then execute : ```Snakemake --snakefile Snakefile_simulation_for_trees --cores 12 --keep-going --rerun-incomplete --latency-wait 30```
 
 Once its executed, you might have a new folder called trees_for_deepl which contains as many subfolders as you want (tunable in the snakefile directly) with the time trees (branches measured in years) and the csv files associated to each tree that stores the leaf names and dates.
 
